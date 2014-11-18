@@ -42,12 +42,16 @@
         {\
             return t.var;\
         }\
+        template<typename T>\
+        static type_ T::* get_member_ptr()\
+        {\
+            return &T::var;\
+        }\
     };\
     enum {reflect_member_id_##var = _reflect_index_of_##var<_reflect_Member>::value}
 
 namespace reflect
 {
-
     struct MemberInfo
     {
         const char* name;
@@ -122,7 +126,59 @@ namespace reflect
             }
         };
 
+        template<typename T, int from, int to, bool valid = from <= to>
+        struct ForMemberDescriptors
+        {
+            ForMemberDescriptors<T, from+1, to> inner;
+
+            template<typename F>
+            bool operator()(F& f)
+            {
+                bool good = f.template processMember<typename T::template _reflect_Member<from,0> >();
+                return good ? inner(f) : false;
+            }
+        };
+
+        template<typename T, int from, int to>
+        struct ForMemberDescriptors<T, from, to, false>
+        {
+            template<typename F>
+            bool operator()(F& f)
+            {
+                return true;
+            }
+        };
+
     } // namespace impl
+
+    template <bool b>
+    struct StaticAssert {
+        typedef void type;
+    };
+
+    template <>
+    struct StaticAssert<true>
+    {
+        typedef int type;
+    };
+
+
+    template<class T, template<int,int> class Member =  T::template _reflect_Member>
+    struct last_member_id
+    {
+        enum { AssertComplete = sizeof(T) };
+        enum
+        {
+            i128=_reflect_VALID(Member,127)*128,
+            i64=i128+_reflect_VALID(Member,i128+63)*64,
+            i32=i64+_reflect_VALID(Member,i64+31)*32,
+            i16=i32+_reflect_VALID(Member,i32+15)*16,
+            i8=i16+_reflect_VALID(Member,i16+7)*8,
+            i4=i8+_reflect_VALID(Member,i8+3)*4,
+            i2=i4+_reflect_VALID(Member,i4+1)*2,
+            value=i2+_reflect_VALID(Member,i2)-1
+        };
+    };
 
     template<typename T, typename F>
     bool for_each_member(T& t, F& f)
@@ -134,6 +190,25 @@ namespace reflect
     bool for_members(T& t, F& f)
     {
         return impl::ForMembers<T,from,to>()(t,f);
+    }
+
+    template<typename T, int from, int to, typename F>
+    bool for_member_descriptors(F& f)
+    {
+        return impl::ForMemberDescriptors<T,from,to>()(f);
+    }
+
+    template<typename T, int from, typename F>
+    bool for_member_descriptors(F& f)
+    {
+        return impl::ForMemberDescriptors<T,from,last_member_id<T>::value>()(f);
+    }
+
+
+    template<typename T, typename F>
+    bool for_member_descriptors(F& f)
+    {
+        return impl::ForMemberDescriptors<T,0,last_member_id<T>::value>()(f);
     }
 
     struct Printer {
