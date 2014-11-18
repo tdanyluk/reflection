@@ -14,58 +14,29 @@ struct S{
     MEMBER(int, alt);
     MEMBER(double, pdop);
     MEMBER(double, hdop);
-    void fun()
-    {
-        int i = reflect::last_member_id<S>::value;
-        std::cout <<i << std::endl;
-    }
 };
 
-struct PrintSquared
+struct EqMul2
 {
-    template<typename T>
-    bool operator()(T& member, reflect::MemberInfo info)
+    template<class MemberInfo, class MemberType>
+    bool process(MemberType& a, const MemberType& b)
     {
-        return std::cout << info.name << "^2=" << member*member << std::endl;
-    }
-};
-
-template<typename T>
-struct Print2
-{
-    T& a;
-    T& b;
-
-    Print2(T& a_, T& b_)
-    :a(a_)
-    ,b(b_)
-    {}
-
-    template<typename Member>
-    bool processMember()
-    {
-        return std::cout << Member::get(a) << " " << Member::get(b) << std::endl;
+        a = b * 2;
+        return true;
     }
 };
 
 int main()
 {
+    S a, b;
 
     reflect::Reader read;
-    reflect::Printer print;
-    S s;
-    s.fun();
-    reflect::for_each_member(s, read);
+    EqMul2 eqMul2;
+    reflect::Printer2 print2;
+
+    reflect::for_each_member(a, read);
+    reflect::for_each_member(b, (const S&)a, eqMul2);
+
     std::cout << std::endl;
-    reflect::for_each_member(s, print);
-    std::cout << std::endl;
-    reflect::for_members<S::reflect_member_id_year,S::reflect_member_id_second>(s, print);
-    Print2<S> print2(s,s);
-    reflect::for_member_descriptors<S, S::reflect_member_id_year,S::reflect_member_id_second>(print2);
-    std::cout << std::endl;
-    reflect::for_member_descriptors<S>(print2);
-    std::cout << std::endl;
-    PrintSquared printSquared;
-    reflect::for_each_member(s, printSquared);
-    return 0;
+    reflect::for_each_member(a, b, print2);
 }
