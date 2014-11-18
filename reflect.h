@@ -33,11 +33,17 @@
            return reflect::MemberInfo(#var);\
         }\
         template<typename T>\
+        static const type_& get(const T& t)\
+        {\
+            return t.var;\
+        }\
+        template<typename T>\
         static type_& get(T& t)\
         {\
             return t.var;\
         }\
-    }
+    };\
+    enum {reflect_member_id_##var = _reflect_index_of_##var<_reflect_Member>::value}
 
 namespace reflect
 {
@@ -49,6 +55,12 @@ namespace reflect
         :name(name_)
         {}
     };
+
+    template<int i, typename T>
+    const typename  T::template _reflect_Member<i,0>::type& get_member(const T& t)
+    {
+        return T::template _reflect_Member<i,0>::get(t);
+    }
 
     template<int i, typename T>
     typename T::template _reflect_Member<i,0>::type& get_member(T& t)
@@ -86,12 +98,42 @@ namespace reflect
                 return true;
             }
         };
+
+        template<typename T, int from, int to, bool valid = from <= to>
+        struct ForMembers
+        {
+            ForMembers<T, from+1, to> inner;
+
+            template<typename F>
+            bool operator()(T& t, F& f)
+            {
+                bool good = f(get_member<from>(t), T::template _reflect_Member<from,0>::info());
+                return good ? inner(t,f) : false;
+            }
+        };
+
+        template<typename T, int from, int to>
+        struct ForMembers<T, from, to, false>
+        {
+            template<typename F>
+            bool operator()(T& t, F& f)
+            {
+                return true;
+            }
+        };
+
     } // namespace impl
 
     template<typename T, typename F>
     bool for_each_member(T& t, F& f)
     {
         return impl::ForEachMember<T>()(t,f);
+    }
+
+    template<int from, int to, typename T, typename F>
+    bool for_members(T& t, F& f)
+    {
+        return impl::ForMembers<T,from,to>()(t,f);
     }
 
     struct Printer {
@@ -110,12 +152,6 @@ namespace reflect
             return std::cin >> t;
         }
     };
-
-    namespace{
-        Printer print;
-        Reader read;
-    }
-
 
 } // namespace reflect
 

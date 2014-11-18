@@ -14,6 +14,7 @@ struct S{
     MEMBER(int, alt);
     MEMBER(double, pdop);
     MEMBER(double, hdop);
+
 };
 
 struct PrintSquared
@@ -27,9 +28,15 @@ struct PrintSquared
 
 int main()
 {
+    reflect::Reader read;
+    reflect::Printer print;
     S s;
-    reflect::for_each_member(s, reflect::read);
-    reflect::for_each_member(s, reflect::print);
+    reflect::for_each_member(s, read);
+    std::cout << std::endl;
+    reflect::for_each_member(s, print);
+    std::cout << std::endl;
+    reflect::for_members<S::reflect_member_id_year,S::reflect_member_id_second>(s, print);
+    std::cout << std::endl;
     PrintSquared printSquared;
     reflect::for_each_member(s, printSquared);
     return 0;
