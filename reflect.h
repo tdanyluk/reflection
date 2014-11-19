@@ -2,7 +2,15 @@
 #define REFLECT_H
 #include <iostream>
 
+template<bool B, class T = void>
+struct enable_if {};
+
+template<class T>
+struct enable_if<true, T> { typedef T type; };
+
+
 #define _reflect_VALID(T,i) (sizeof(reflect::impl::valid<T,i>(0))==sizeof(char)?1:0)
+#define IS_REFLECTED(T) (sizeof(reflect::impl::valid2<T>(0))==sizeof(char)?1:0)
 
 #define ESC(...) __VA_ARGS__
 #define ANNOTATION(T, ...) \
@@ -17,7 +25,8 @@
         };\
     };)
 
-#define MEMBER_ANNOT(type_, var, annotations)  \
+#define MEMBER_EX(type_, var, annotations)  \
+    struct _reflect_Reflected;\
     template<int i, int _>\
     struct _reflect_Member;\
     template<template<int,int> class T>\
@@ -68,7 +77,7 @@
     };\
     enum {reflect_member_id_##var = _reflect_index_of_##var<_reflect_Member>::value}
 
-#define MEMBER(type_, var) MEMBER_ANNOT(type_, var, )
+#define MEMBER(type_, var) MEMBER_EX(type_, var, )
 
 namespace reflect
 {
@@ -91,6 +100,12 @@ namespace reflect
 
         template<template<int,int> class T, int i>
         static long valid(...);
+
+        template<class T>
+        static char valid2(typename T::_reflect_Reflected*);
+
+        template<class T>
+        static long valid2(...);
 
         template<typename T, int from, int to, bool valid = from <= to>
         struct ForMemberDescriptors

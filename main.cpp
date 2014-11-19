@@ -70,7 +70,7 @@ DefFun(Interpolate, SavedArgs_1(const double, ratio), Args_3,
        a = b*(1-ratio) + c*(ratio));
 
 struct A{
-    MEMBER_ANNOT(double, a, ANNOTATION(HexaAnnotation,={10,20}));
+    MEMBER_EX(double, a, ANNOTATION(HexaAnnotation, ={10,20}));
     MEMBER(double, b);
     MEMBER(double, c);
 };
@@ -93,9 +93,46 @@ struct NewPrinter {
     }
 };
 
+struct B
+{
+    MEMBER(int,x);
+    MEMBER(int,y);
+    MEMBER(A,z);
+};
+
+struct C
+{
+    int a;
+    struct TT;
+    struct TT;
+};
+
+struct RecPrinter {
+    template<class MemberInfo, class MemberType>
+    enable_if<!IS_REFLECTED(MemberType),bool> process(const MemberType& value)
+    {
+        return std::cout << MemberInfo::name() << ": " << value << std::endl;
+    }
+
+    template<class MemberInfo, class MemberType>
+    enable_if<IS_REFLECTED(MemberType),bool> process(const MemberType& value)
+    {
+        return std::cout << "sub struct" << std::endl;
+    }
+
+    template<class MemberInfo>
+    bool process(int value)
+    {
+        return std::cout << "int lol" << std::endl;
+    }
+};
 
 int main()
 {
+    B bb;
+    RecPrinter rec_print;
+    reflect::for_each_member(bb, rec_print);
+
     A a1 = {1,2,3};
     A a2 = {10,10,10};
     A a3;
@@ -107,7 +144,8 @@ int main()
     reflect::for_each_member(a3, a1, a2, inter);
     reflect::Printer print;
     reflect::for_each_member(a3, print);
-
+    C cc;
+   // reflect::for_each_member(cc, print);
     S a, b;
 
     reflect::Reader read;
