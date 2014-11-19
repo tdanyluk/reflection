@@ -11,6 +11,10 @@ struct enable_if<true, T> { typedef T type; };
 
 #define _reflect_VALID(T,i) (sizeof(reflect::impl::valid<T,i>(0))==sizeof(char)?1:0)
 #define IS_REFLECTED(T) (sizeof(reflect::impl::valid2<T>(0))==sizeof(char)?1:0)
+#define if_not_struct_bool typename enable_if<!IS_REFLECTED(MemberType),bool>::type
+#define if_struct_bool typename enable_if<IS_REFLECTED(MemberType),bool>::type
+//#define if_not_struct(Type,ReturnType) typename enable_if<!IS_REFLECTED(Type),ReturnType>::type
+//#define if_struct(Type,ReturnType) typename enable_if<IS_REFLECTED(Type),ReturnType>::type
 
 #define ESC(...) __VA_ARGS__
 #define ANNOTATION(T, ...) \

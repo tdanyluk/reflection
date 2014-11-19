@@ -1,4 +1,5 @@
 #include "reflect.h"
+#include <vector>
 
 struct HexaAnnotation {int a, b;};
 
@@ -98,6 +99,7 @@ struct B
     MEMBER(int,x);
     MEMBER(int,y);
     MEMBER(A,z);
+    MEMBER(std::vector<A>, v);
 };
 
 struct C
@@ -109,32 +111,58 @@ struct C
 
 struct RecPrinter {
     template<class MemberInfo, class MemberType>
-    enable_if<!IS_REFLECTED(MemberType),bool> process(const MemberType& value)
+    if_not_struct_bool process(const MemberType& value)
     {
         return std::cout << MemberInfo::name() << ": " << value << std::endl;
     }
 
     template<class MemberInfo, class MemberType>
-    enable_if<IS_REFLECTED(MemberType),bool> process(const MemberType& value)
+    if_struct_bool process(const MemberType& value)
     {
-        return std::cout << "sub struct" << std::endl;
+        return (std::cout << MemberInfo::name() << ": {")
+            && (reflect::for_each_member(value, *this))
+            && (std::cout << "}, " << std::endl);
     }
 
-    template<class MemberInfo>
-    bool process(int value)
+    template<class MemberInfo, class T>
+    bool process(const std::vector<T>& value)
     {
-        return std::cout << "int lol" << std::endl;
+        if(!(std::cout << MemberInfo::name() << ": ["))
+            return false;
+        for(size_t i = 0; i<value.size(); i++)
+        {
+            processVectorElem(value[i]);
+        }
+        if(!(std::cout << "], "<< std::endl))
+            return false;
+        return true;
+    }
+
+    template<class MemberType>
+    if_not_struct_bool processVectorElem(const MemberType& value)
+    {
+        return std::cout << value << ",";
+    }
+
+    template<class MemberType>
+    if_struct_bool processVectorElem(const MemberType& value)
+    {
+        return (std::cout << "{")
+            && (reflect::for_each_member(value, *this))
+            && (std::cout << "}, " << std::endl);
     }
 };
 
 int main()
 {
     B bb;
-    RecPrinter rec_print;
-    reflect::for_each_member(bb, rec_print);
-
     A a1 = {1,2,3};
     A a2 = {10,10,10};
+    bb.v.push_back(a1);
+    bb.v.push_back(a2);
+    RecPrinter rec_print;
+    reflect::for_each_member(bb, rec_print);
+    return 0;
     A a3;
 
     NewPrinter new_print;
