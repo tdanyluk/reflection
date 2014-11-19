@@ -4,7 +4,20 @@
 
 #define _reflect_VALID(T,i) (sizeof(reflect::impl::valid<T,i>(0))==sizeof(char)?1:0)
 
-#define MEMBER(type_, var)  \
+#define ESC(...) __VA_ARGS__
+#define ANNOTATION(T, ...) \
+    ESC(template<int _2>\
+    struct Annotation<T,_2>\
+    {\
+        static const bool has = true;\
+        static T get()\
+        {\
+            T a __VA_ARGS__;\
+            return a;\
+        };\
+    };)
+
+#define MEMBER_ANNOT(type_, var, annotations)  \
     template<int i, int _>\
     struct _reflect_Member;\
     template<template<int,int> class T>\
@@ -42,8 +55,20 @@
         {\
             return t.var;\
         }\
+        template<typename T, int _2= 0>\
+        struct Annotation\
+        {\
+            static const bool has = false;\
+            static T get()\
+            {\
+                return *(T*)0;\
+            };\
+        };\
+        annotations\
     };\
     enum {reflect_member_id_##var = _reflect_index_of_##var<_reflect_Member>::value}
+
+#define MEMBER(type_, var) MEMBER_ANNOT(type_, var, )
 
 namespace reflect
 {

@@ -1,5 +1,7 @@
 #include "reflect.h"
 
+struct HexaAnnotation {int a, b;};
+
 struct S{
     MEMBER(unsigned, timePosix);
     MEMBER(int, year);
@@ -15,8 +17,6 @@ struct S{
     MEMBER(double, pdop);
     MEMBER(double, hdop);
 };
-
-#define ESC(...) __VA_ARGS__
 
 #define Args_1 \
     ESC(template<class MemberInfo, class T1>\
@@ -70,16 +70,39 @@ DefFun(Interpolate, SavedArgs_1(const double, ratio), Args_3,
        a = b*(1-ratio) + c*(ratio));
 
 struct A{
-    MEMBER(double, a);
+    MEMBER_ANNOT(double, a, ANNOTATION(HexaAnnotation,={10,20}));
     MEMBER(double, b);
     MEMBER(double, c);
 };
+
+struct NewPrinter {
+    template<class MemberInfo, class MemberType>
+    bool process(const MemberType& value)
+    {
+        if(MemberInfo::template Annotation<HexaAnnotation>::has)
+        {
+            std::cout << std::hex;
+            HexaAnnotation a = MemberInfo::template Annotation<HexaAnnotation>::get();
+            std::cout << "a.a: " << a.a <<std::endl;
+        }
+        else
+        {
+            std::cout << std::dec;
+        }
+        return std::cout << MemberInfo::name() << ": " << value << std::endl;
+    }
+};
+
 
 int main()
 {
     A a1 = {1,2,3};
     A a2 = {10,10,10};
     A a3;
+
+    NewPrinter new_print;
+    reflect::for_each_member(a2, new_print);
+
     Interpolate inter(0.2);
     reflect::for_each_member(a3, a1, a2, inter);
     reflect::Printer print;
