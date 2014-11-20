@@ -1,5 +1,8 @@
 #include "reflect.h"
 #include <vector>
+#include <map>
+#include <set>
+#include <sstream>
 
 struct HexaAnnotation {int a, b;};
 
@@ -96,10 +99,14 @@ struct NewPrinter {
 
 struct B
 {
+    typedef std::map<int,int> mii;
     MEMBER(int,x);
     MEMBER(int,y);
     MEMBER(A,z);
     MEMBER(std::vector<A>, v);
+    MEMBER(std::set<int>, s);
+    MEMBER(mii, m);
+    std::string ss;
 };
 
 struct C
@@ -109,47 +116,161 @@ struct C
     struct TT;
 };
 
+/* causes compiler error
+template<typename P>
+struct const_pair_reflector{
+    MEMBER(typename P::first_type&,first);
+    MEMBER(typename P::second_type&,second);
+    const_pair_reflector(P& p)
+    : first(p.first)
+    , second(p.second)
+    {}
+};*/
+
+std::string jsonQuote( const char *value )
+{
+   if (value == NULL)
+      return "";
+   // Not sure how to handle unicode...
+   if (std::strpbrk(value, "\"\\\b\f\n\r\t") == NULL && !containsControlCharacter( value ))
+      return std::string("\"") + value + "\"";
+   // We have to walk value and escape any special characters.
+   // Appending to std::string is not efficient, but this should be rare.
+   // (Note: forward slashes are *not* rare, but I am not escaping them.)
+   std::string::size_type maxsize = strlen(value)*2 + 3; // allescaped+quotes+NULL
+   std::string result;
+   result.reserve(maxsize); // to avoid lots of mallocs
+   result += "\"";
+   for (const char* c=value; *c != 0; ++c)
+   {
+      switch(*c)
+      {
+         case '\"':
+            result += "\\\"";
+            break;
+         case '\\':
+            result += "\\\\";
+            break;
+         case '\b':
+            result += "\\b";
+            break;
+         case '\f':
+            result += "\\f";
+            break;
+         case '\n':
+            result += "\\n";
+            break;
+         case '\r':
+            result += "\\r";
+            break;
+         case '\t':
+            result += "\\t";
+            break;
+         //case '/':
+            // Even though \/ is considered a legal escape in JSON, a bare
+            // slash is also legal, so I see no reason to escape it.
+            // (I hope I am not misunderstanding something.
+            // blep notes: actually escaping \/ may be useful in javascript to avoid </
+            // sequence.
+            // Should add a flag to allow this compatibility mode and prevent this
+            // sequence from occurring.
+         default:
+            if ( isControlCharacter( *c ) )
+            {
+               std::ostringstream oss;
+               oss << "\\u" << std::hex << std::uppercase << std::setfill('0') << std::setw(4) << static_cast<int>(*c);
+               result += oss.str();
+            }
+            else
+            {
+               result += *c;
+            }
+            break;
+      }
+   }
+   result += "\"";
+   return result;
+}
+
 struct RecPrinter {
-    template<class MemberInfo, class MemberType>
-    if_not_struct_bool process(const MemberType& value)
-    {
-        return std::cout << MemberInfo::name() << ": " << value << std::endl;
-    }
+    int indentLevel;
+    std::string indent;
+    RecPrinter(int indentLevel_ = 0)
+    :indentLevel(indentLevel_)
+    ,indent(indentLevel_*2,' ')
+    {};
 
     template<class MemberInfo, class MemberType>
-    if_struct_bool process(const MemberType& value)
+    bool process(const MemberType& value)
     {
-        return (std::cout << MemberInfo::name() << ": {")
-            && (reflect::for_each_member(value, *this))
-            && (std::cout << "}, " << std::endl);
+        return (std::cout << indent << MemberInfo::name() << ": " )
+                && processValue(value);
+    }
+
+    template<class MemberInfo, class Container>
+    bool processContainer(const Container& cont)
+    {
+        RecPrinter p(indentLevel+1);
+        if(!(std::cout << indent << MemberInfo::name() << ": [" << std::endl))
+            return false;
+        for(typename Container::const_iterator it = cont.begin(); it!=cont.end(); ++it)
+        {
+            if(!p.processValue(*it, false))
+                return false;
+        }
+        if(!(std::cout <<  indent << "], "<< std::endl))
+            return false;
+        return true;
     }
 
     template<class MemberInfo, class T>
     bool process(const std::vector<T>& value)
     {
-        if(!(std::cout << MemberInfo::name() << ": ["))
-            return false;
-        for(size_t i = 0; i<value.size(); i++)
-        {
-            processVectorElem(value[i]);
-        }
-        if(!(std::cout << "], "<< std::endl))
-            return false;
-        return true;
+        return processContainer<MemberInfo>(value);
+    }
+
+    template<class MemberInfo, class T>
+    bool process(const std::set<T>& value)
+    {
+        return processContainer<MemberInfo>(value);
+    }
+
+    template<class MemberInfo, class K, class V>
+    bool process(const std::map<K,V>& value)
+    {
+        return processContainer<MemberInfo>(value);
+    }
+
+    template<class T1, class T2>
+    bool processValue(const std::pair<T1,T2>& value, bool continueLastLine=true)
+    {
+        //const_pair_reflector<const std::pair<T1,T2> > pr(value);
+        RecPrinter p(indentLevel+1);
+        return (std::cout << (continueLastLine?"":indent) << "{"  << std::endl)
+            && (std::cout << indent << "  first: ") && p.processValue(value.first)
+            && (std::cout << indent << "  second: ") && p.processValue(value.second)
+            && (std::cout <<  indent << "}, " << std::endl);
     }
 
     template<class MemberType>
-    if_not_struct_bool processVectorElem(const MemberType& value)
+    bool processValue(const std::string& value, bool continueLastLine = true)
     {
-        return std::cout << value << ",";
+        return std::cout << (continueLastLine?"":indent) << '"' << jsonQuote(value.c_str()) << '"' << ","  << std::endl;
     }
 
     template<class MemberType>
-    if_struct_bool processVectorElem(const MemberType& value)
+    if_not_struct_bool processValue(const MemberType& value, bool continueLastLine = true)
     {
-        return (std::cout << "{")
-            && (reflect::for_each_member(value, *this))
-            && (std::cout << "}, " << std::endl);
+        return std::cout << (continueLastLine?"":indent) << value << ","  << std::endl;
+    }
+
+    template<class MemberType>
+    if_struct_bool processValue(const MemberType& value, bool continueLastLine = true)
+    {
+        RecPrinter p(indentLevel+1);
+        return (std::cout << (continueLastLine?"":indent) << "{"  << std::endl)
+            && (reflect::for_each_member(value, p))
+            && (std::cout <<  indent << "}, " << std::endl);
     }
 };
 
@@ -160,6 +281,10 @@ int main()
     A a2 = {10,10,10};
     bb.v.push_back(a1);
     bb.v.push_back(a2);
+    bb.s.insert(30);
+    bb.m[5] = 6;
+    bb.m[6] = 8;
+    bb.ss = "Hi\n\r\\lol";
     RecPrinter rec_print;
     reflect::for_each_member(bb, rec_print);
     return 0;

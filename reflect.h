@@ -8,6 +8,11 @@ struct enable_if {};
 template<class T>
 struct enable_if<true, T> { typedef T type; };
 
+template <class T>
+struct add_reference
+{
+   typedef T& type;
+};
 
 #define _reflect_VALID(T,i) (sizeof(reflect::impl::valid<T,i>(0))==sizeof(char)?1:0)
 #define IS_REFLECTED(T) (sizeof(reflect::impl::valid2<T>(0))==sizeof(char)?1:0)
@@ -59,12 +64,12 @@ struct enable_if<true, T> { typedef T type; };
            return #var;\
         }\
         template<typename T>\
-        static const type_& get(const T& t)\
+        static typename add_reference<const type_>::type get(const T& t)\
         {\
             return t.var;\
         }\
         template<typename T>\
-        static type_& get(T& t)\
+        static typename add_reference<type_>::type get(T& t)\
         {\
             return t.var;\
         }\
